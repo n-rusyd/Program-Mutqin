@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Program Kontrol Tahfiz SD Muhammadiyah Sudagaran</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0fdf4; min-height: 100vh; }
+        /* Tema Biru Elegan */
+        .bg-primary { background-color: #1d4ed8; } 
+        .text-primary { color: #1e3a8a; } 
+        .border-primary { border-color: #3b82f6; } 
+        
+        .screen { display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        .screen.active { display: block; opacity: 1; }
+        
+        /* Toast Notifikasi */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { padding: 12px 24px; border-radius: 8px; color: white; font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background-color: #10b981; }
+        .toast.error { background-color: #ef4444; }
+        .toast.info { background-color: #3b82f6; }
+        
+        /* Loading Spinner */
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #ffffff; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="bg-primary text-white p-3 md:p-4 shadow-lg sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3 w-full md:w-auto justify-center md:justify-start">
+                <img src="https://iili.io/CSy5Naa.md.png" alt="Logo" class="h-12 w-auto bg-white rounded-full p-1 shadow-sm">
+                <div class="text-center md:text-left">
+                    <h1 class="font-bold text-lg md:text-xl tracking-wide">KONTROL TAHFIZ</h1>
+                    <p class="text-xs text-blue-200">SD Muhammadiyah Sudagaran Wonosobo</p>
+                </div>
+            </div>
+            <div id="realtime-clock" class="text-xs md:text-sm bg-blue-800 py-1.5 px-4 rounded-full border border-blue-600 shadow-inner flex items-center gap-2 font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Memuat waktu...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 mt-2 md:mt-6">
+        <!-- SCREEN 1: LOGIN -->
+        <section id="login-screen" class="screen active">
+            <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8 max-w-md mx-auto border-t-8 border-primary">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-primary">Masuk Aplikasi</h2>
+                    <p class="text-sm text-gray-500 mt-1">Silakan pilih kelas dan nama Anda</p>
+                </div>
+                
+                <div id="status-csv" class="text-center text-sm font-medium text-blue-600 mb-4 bg-blue-50 p-2 rounded-lg">Memuat data siswa dari server...</div>
+                
+                <form id="login-form" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Pilih Kelas</label>
+                        <select id="kelas" class="w-full border-2 border-gray-200 rounded-xl p-3 bg-gray-50 outline-none focus:border-blue-500 transition-colors">
+                            <option value="">-- Memuat daftar kelas... --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Pilih Nama Siswa</label>
+                        <select id="siswa" disabled class="w-full border-2 border-gray-200 rounded-xl p-3 bg-gray-100 outline-none focus:border-blue-500 transition-colors cursor-not-allowed">
+                            <option value="">-- Pilih Kelas Terlebih Dahulu --</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="btn-login" disabled class="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md transform hover:-translate-y-0.5">
+                        Lanjutkan
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: ENTRY DATA -->
+        <section id="entry-screen" class="screen">
+            <div class="bg-white rounded-2xl shadow-xl p-6 md:p-8 max-w-lg mx-auto border-t-8 border-green-500 relative overflow-hidden">
+                <button type="button" onclick="navigate('login')" class="absolute top-4 left-4 text-gray-400 hover:text-gray-700 transition-colors" title="Kembali">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                </button>
+                <button type="button" onclick="navigate('dashboard')" class="absolute top-4 right-4 text-green-700 hover:text-green-800 font-bold text-sm bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 transition-colors flex items-center gap-1 shadow-sm" title="Lihat Dasbor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                    Dasbor
+                </button>
+                
+                <h2 class="text-2xl font-bold text-center text-gray-800 mb-2 mt-4">Input Setoran</h2>
+                <div class="bg-green-50 p-3 rounded-lg text-center mb-6 border border-green-100">
+                    <p class="text-sm text-gray-600">Siswa:</p>
+                    <p id="display-nama" class="font-bold text-lg text-green-800">-</p>
+                    <p id="display-kelas" class="text-xs font-semibold text-green-600 bg-green-200 inline-block px-2 py-0.5 rounded mt-1">-</p>
+                </div>
+
+                <form id="entry-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Murojaah (Mengulang Hafalan)</label>
+                        <textarea id="murojaah" class="w-full border-2 border-gray-200 rounded-xl p-3 outline-none focus:border-blue-500 transition-colors" rows="2" placeholder="Contoh: An Naba ayat 1-15"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Ziyadah (Menambah Hafalan)</label>
+                        <textarea id="ziyadah" class="w-full border-2 border-gray-200 rounded-xl p-3 bg-gray-100 outline-none text-gray-500 cursor-not-allowed" rows="2" readonly placeholder="Diisi oleh Ustaz/ah"></textarea>
+                    </div>
+                    
+                    <div class="space-y-3 pt-2">
+                        <button type="submit" id="btn-submit" class="w-full bg-green-600 text-white font-bold py-3.5 rounded-xl hover:bg-green-700 transition-all shadow-md transform hover:-translate-y-0.5 flex justify-center items-center">
+                            <span id="submit-text">Simpan Laporan Tahfiz</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: DASHBOARD -->
+        <section id="dashboard-screen" class="screen">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="dashboard-title" class="text-xl md:text-2xl font-bold text-primary flex items-center gap-2">Dasbor Tahfiz</h2>
+                <button onclick="navigate('entry')" class="bg-white text-primary border border-primary px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-50 transition-colors shadow-sm">Kembali Input</button>
+            </div>
+
+            <div id="view-siswa" class="block">
+                <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl shadow-lg p-5 mb-4 text-white">
+                    <p class="text-sm text-blue-200">Siswa:</p>
+                    <p id="dashboard-nama" class="font-bold text-xl">-</p>
+                </div>
+
+                <!-- Motivasi Harian (Hadits Shahih tentang Al-Qur'an) -->
+                <div class="bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-2xl mb-6 shadow-sm flex items-start gap-3">
+                    <div class="text-indigo-600 mt-0.5 flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-indigo-800 uppercase tracking-wider mb-1">Motivasi Harian (Hadits Shahih)</h4>
+                        <p id="motivasi-text" class="text-sm font-semibold text-indigo-950 italic leading-relaxed">Memuat motivasi...</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 md:p-6 rounded-2xl shadow-lg border border-gray-100 h-64 md:h-80 mb-6">
+                    <canvas id="progressChart"></canvas>
+                </div>
+
+                <!-- Tabel Murojaah & Ziyadah -->
+                <div class="bg-white rounded-2xl shadow-lg border-t-8 border-blue-500 overflow-hidden mb-6">
+                    <h3 class="bg-blue-50 p-4 font-bold text-blue-800 border-b border-blue-100 text-center">Riwayat Setoran Pekan Ini</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-blue-100 text-blue-900 text-xs uppercase font-bold">
+                                <tr>
+                                    <th class="px-4 py-3 border-b border-blue-200">Tanggal</th>
+                                    <th class="px-4 py-3 border-b border-blue-200">Murojaah</th>
+                                    <th class="px-4 py-3 border-b border-blue-200">Ziyadah</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-murojaah" class="text-sm divide-y divide-gray-100">
+                                <tr><td colspan="3" class="p-4 text-center text-gray-500">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // ==========================================
+        // KONFIGURASI URL SERVER (SANGAT PENTING)
+        // ==========================================
+        const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQUd7iLtgh1Py55DxxT9kd9nrA-bHsC9845Hf8d5_z1Aw5i_tp99dPxx7r_tyFMOpCRR4tBMkKjpk1V/pub?gid=1746779222&single=true&output=csv";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnhvEEVToXKvMWAmLYcWceQk-sV1790zeAdQAyuf9n4Px8DhjmJFdkY9aOAl-I1DuB/exec";
+
+        // Variabel Global
+        let allSiswa = [];
+        let currentUser = { kelas: "", nama: "" };
+        let progressChartInstance = null;
+        let isDummyData = false;
+        let dummyRecords = [];
+
+        // Kumpulan Dalil Motivasi
+        const motivasiList = [
+            '"Sebaik-baik kalian adalah yang mempelajari Al-Qur\'an dan mengajarkannya." (HR. Bukhari)',
+            '"Bacalah Al-Qur\'an, sesungguhnya ia akan datang pada hari kiamat memberi syafaat bagi pembacanya." (HR. Muslim)',
+            '"Orang yang mahir membaca Al-Qur\'an kelak akan bersama para malaikat yang mulia dan taat." (HR. Bukhari & Muslim)',
+            '"Tidaklah suatu kaum berkumpul di rumah Allah membaca Al-Qur\'an... melainkan turun ketenangan kepada mereka." (HR. Muslim)',
+            '"Barangsiapa membaca satu huruf dari Kitabullah, maka baginya satu kebaikan." (HR. Tirmidzi)',
+            '"Puasa dan Al-Qur\'an akan memberi syafaat kepada seorang hamba pada hari kiamat." (HR. Ahmad)',
+            '"Perumpamaan orang beriman yang membaca Al-Qur\'an adalah seperti buah Utrujjah, baunya wangi dan rasanya enak." (HR. Bukhari)',
+            '"Sesungguhnya Allah mengangkat derajat beberapa kaum dengan Al-Qur\'an dan merendahkan yang lain dengannya." (HR. Muslim)'
+        ];
+
+        // 1. Inisialisasi Aplikasi (Load Daftar Siswa)
+        async function init() {
+            setClock();
+            setInterval(setClock, 1000);
+            setMotivasi();
+
+            const statusEl = document.getElementById('status-csv');
+            const kelasSelect = document.getElementById('kelas');
+            
+            try {
+                const res = await fetch(CSV_URL + '&t=' + new Date().getTime());
+                if (!res.ok) throw new Error("Status Error: " + res.status);
+                
+                const data = await res.text();
+                
+                if (data.trim().toLowerCase().startsWith('<!doctype') || data.trim().toLowerCase().startsWith('<html')) {
+                    throw new Error("URL mengarah ke halaman web. Pastikan Spreadsheet 'Dipublikasikan ke web' dengan format .csv");
+                }
+
+                function parseCSV(str) {
+                    const arr = [];
+                    let quote = false, row = 0, col = 0;
+                    for (let c = 0; c < str.length; c++) {
+                        let cc = str[c], nc = str[c+1];
+                        arr[row] = arr[row] || [];
+                        arr[row][col] = arr[row][col] || '';
+                        if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+                        if (cc == '"') { quote = !quote; continue; }
+                        if (cc == ',' && !quote) { ++col; continue; }
+                        if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                        if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+                        if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+                        arr[row][col] += cc;
+                    }
+                    return arr;
+                }
+
+                const rows = parseCSV(data);
+                allSiswa = [];
+                
+                if (rows.length === 0 || !rows[0]) throw new Error("Data CSV kosong.");
+
+                const headers = rows[0].map(h => (h || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+                let colKelas = -1, colNama = -1;  
+                
+                for (let j = 0; j < headers.length; j++) {
+                    if (headers[j].includes('kelas')) colKelas = j;
+                    if (headers[j].includes('nama') || headers[j].includes('siswa')) colNama = j;
+                }
+
+                if (colKelas === -1) colKelas = 1; 
+                if (colNama === -1) colNama = 2;   
+                
+                for (let i = 1; i < rows.length; i++) {
+                    const cols = rows[i];
+                    if (!cols || cols.length === 0) continue; 
+                    
+                    if (cols.length > Math.min(colKelas, colNama)) { 
+                        const kelas = cols[colKelas] ? cols[colKelas].trim() : '';
+                        const nama = cols[colNama] ? cols[colNama].trim() : '';
+                        if(kelas && nama) allSiswa.push({ kelas: kelas, nama: nama });
+                    }
+                }
+                
+                if(allSiswa.length > 0) {
+                    statusEl.style.display = 'none';
+                    const uniqueKelas = [...new Set(allSiswa.map(s => s.kelas))].sort();
+                    kelasSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+                    uniqueKelas.forEach(k => {
+                        kelasSelect.appendChild(new Option(k, k));
+                    });
+                } else {
+                    throw new Error("Kolom 'Kelas' dan 'Nama' tidak ditemukan atau kosong.");
+                }
+                
+            } catch (e) {
+                console.error("Error CSV:", e);
+                statusEl.innerHTML = `
+                    <div class="font-bold text-red-600 mb-2">⚠️ Gagal Memuat Data Siswa</div>
+                    <div class="text-xs text-left bg-white p-2 rounded border border-red-200 text-red-800 mb-3 shadow-inner">
+                        Pastikan URL <code>CSV_URL</code> valid dan berformat CSV.
+                        <br/><span class="text-gray-500 italic text-[10px] mt-1 block">${e.message}</span>
+                    </div>
+                    <button type="button" onclick="loadDummyData()" class="text-xs font-bold bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 shadow-md transition-all">Gunakan Data Uji Coba</button>
+                `;
+                statusEl.classList.replace('bg-blue-50', 'bg-red-50');
+                statusEl.classList.replace('text-blue-600', 'text-gray-800');
+                statusEl.classList.add('flex', 'flex-col', 'items-center', 'p-4');
+                kelasSelect.innerHTML = '<option value="">-- Setup Data Gagal --</option>';
+            }
+        }
+
+        // Fungsi Fallback untuk Data Uji Coba (Dipersingkat)
+        function loadDummyData() {
+            isDummyData = true;
+            allSiswa = [
+                { kelas: "1 Abu Bakar", nama: "Ahmad Al Farisi" },
+                { kelas: "1 Abu Bakar", nama: "Aisyah Putri" },
+                { kelas: "2 Umar", nama: "Budi Santoso" }
+            ];
+            
+            const now = new Date();
+            const kemarin = new Date(now); kemarin.setDate(kemarin.getDate() - 1);
+            
+            dummyRecords = [
+                { tanggal: kemarin.toISOString(), nama: "Ahmad Al Farisi", kelas: "1 Abu Bakar", murojaah: "Al-Falaq", ziyadah: "An-Nas" }
+            ];
+
+            const statusEl = document.getElementById('status-csv');
+            const kelasSelect = document.getElementById('kelas');
+            
+            statusEl.style.display = 'none';
+            const uniqueKelas = [...new Set(allSiswa.map(s => s.kelas))].sort();
+            kelasSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+            uniqueKelas.forEach(k => kelasSelect.appendChild(new Option(k, k)));
+            
+            showToast("Berhasil memuat data uji coba!", "success");
+        }
+
+        // 2. Interaksi UI
+        const kelasSelect = document.getElementById('kelas');
+        const siswaSelect = document.getElementById('siswa');
+        const btnLogin = document.getElementById('btn-login');
+
+        kelasSelect.addEventListener('change', (e) => {
+            const kelasDipilih = e.target.value;
+            siswaSelect.innerHTML = '<option value="">-- Pilih Nama Siswa --</option>';
+            
+            if(!kelasDipilih) {
+                siswaSelect.disabled = true;
+                siswaSelect.classList.add('bg-gray-100', 'cursor-not-allowed');
+                btnLogin.disabled = true;
+                return;
+            }
+
+            const siswaKelas = allSiswa.filter(s => s.kelas === kelasDipilih);
+            siswaKelas.forEach(s => siswaSelect.appendChild(new Option(s.nama, s.nama)));
+            
+            siswaSelect.disabled = false;
+            siswaSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            siswaSelect.classList.add('bg-white');
+            btnLogin.disabled = true;
+        });
+
+        siswaSelect.addEventListener('change', () => btnLogin.disabled = !siswaSelect.value);
+
+        // 3. Proses Login
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentUser.kelas = kelasSelect.value;
+            currentUser.nama = siswaSelect.value;
+            
+            document.getElementById('display-nama').textContent = currentUser.nama;
+            document.getElementById('display-kelas').textContent = currentUser.kelas;
+            document.getElementById('dashboard-nama').textContent = currentUser.nama;
+            
+            navigate('entry');
+        });
+
+        // 4. Proses Submit Data (Jendela 2)
+        document.getElementById('entry-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const murojaah = document.getElementById('murojaah').value.trim();
+            let ziyadah = document.getElementById('ziyadah').value.trim();
+
+            if (ziyadah.toLowerCase().includes('diisi oleh')) {
+                ziyadah = "";
+            }
+
+            if (!murojaah) {
+                return showToast("Mohon isi setoran Murojaah", "error");
+            }
+
+            const btnSubmit = document.getElementById('btn-submit');
+            const submitText = document.getElementById('submit-text');
+            
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-70', 'cursor-wait');
+            submitText.innerHTML = '<span class="loader"></span> Mengirim data...';
+
+            const payload = {
+                tanggal: new Date().toISOString(), 
+                nama: currentUser.nama,
+                kelas: currentUser.kelas,
+                murojaah: murojaah,
+                ziyadah: ziyadah
+            };
+
+            try {
+                if (isDummyData) {
+                    await new Promise(r => setTimeout(r, 500));
+                    dummyRecords.push(payload);
+                    showToast("Laporan berhasil disimpan! (Uji Coba)", "success");
+                } else {
+                    const res = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await res.json();
+                    if (result.status === 'success') {
+                        showToast("Laporan berhasil disimpan!", "success");
+                    } else {
+                        throw new Error(result.message || "Gagal menyimpan");
+                    }
+                }
+                document.getElementById('murojaah').value = '';
+                document.getElementById('ziyadah').value = '';
+                navigate('dashboard');
+            } catch (error) {
+                console.error("Error Submit:", error);
+                showToast("Gagal terhubung ke server. Pastikan URL Script benar.", "error");
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-70', 'cursor-wait');
+                submitText.textContent = 'Simpan Laporan Tahfiz';
+            }
+        });
+
+        // 5. Muat Data Dashboard dengan Pemrosesan Ringan (Jendela 3)
+        function getYYYYMMDD(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function getWeekDates() {
+            const monday = new Date();
+            const day = monday.getDay();
+            const diff = monday.getDate() - day + (day === 0 ? -6 : 1); 
+            monday.setDate(diff);
+            monday.setHours(0,0,0,0);
+            
+            return Array.from({length: 6}, (_, i) => {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                return d;
+            });
+        }
+
+        async function loadDashboardData() {
+            setMotivasi();
+            const tbodyMurojaah = document.getElementById('table-murojaah');
+            tbodyMurojaah.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-500"><div class="flex justify-center items-center gap-2"><span class="loader border-blue-500 border-t-transparent"></span> Memuat data mingguan...</div></td></tr>`;
+
+            try {
+                let records = [];
+                
+                if (isDummyData) {
+                    records = dummyRecords;
+                } else {
+                    const fetchUrl = SCRIPT_URL + (SCRIPT_URL.includes('?') ? '&' : '?') + 'nocache=' + new Date().getTime();
+                    const res = await fetch(fetchUrl, { redirect: 'follow' });
+                    
+                    if (!res.ok) throw new Error(res.status === 404 ? "HTTP 404: URL Google Apps Script tidak ditemukan." : `HTTP Error: ${res.status}`);
+                    
+                    const responseText = await res.text();
+                    try { records = JSON.parse(responseText); } catch (e) { throw new Error("Respon server tidak valid."); }
+                    
+                    if (!Array.isArray(records)) {
+                        if (records && records.status === 'error') throw new Error(records.message);
+                        records = []; 
+                    }
+                }
+                
+                const myRecords = records.filter(r => r.nama === currentUser.nama);
+                const weekDates = getWeekDates();
+                const labels = weekDates.map(d => d.toLocaleDateString('id-ID', { weekday: 'long' }));
+                
+                const dataMurojaah = [], colorsMurojaah = [];
+                const dataZiyadah = [], colorsZiyadah = [];
+                const todayZero = new Date(); todayZero.setHours(0,0,0,0);
+
+                let htmlContent = '';
+                
+                weekDates.forEach(date => {
+                    const dateStr = getYYYYMMDD(date);
+                    
+                    // PENGGABUNGAN DATA (MERGE): Membaca SEMUA baris di hari yang sama agar Ziyadah dari Ustaz/ah tidak terlewat
+                    const recordsForDate = myRecords.filter(r => {
+                        try { return getYYYYMMDD(new Date(r.tanggal)) === dateStr; } catch(e) { return false; }
+                    });
+
+                    let safeMurojaah = '';
+                    let safeZiyadah = '';
+
+                    recordsForDate.forEach(r => {
+                        if (r.murojaah && String(r.murojaah).trim() !== '' && String(r.murojaah).trim() !== '-') {
+                            safeMurojaah = String(r.murojaah).trim();
+                        }
+                        if (r.ziyadah && String(r.ziyadah).trim() !== '' && String(r.ziyadah).trim() !== '-' && !String(r.ziyadah).toLowerCase().includes('diisi')) {
+                            safeZiyadah = String(r.ziyadah).trim(); // Ziyadah diperbarui jika Ustaz/ah mengisinya di baris terpisah
+                        }
+                    });
+
+                    const hasMurojaah = safeMurojaah !== '';
+                    const hasZiyadah = safeZiyadah !== '';
+                    
+                    let statusMurojaah = '-', statusZiyadah = '-';
+                    const isPast = date.getTime() < todayZero.getTime();
+                    const isToday = date.getTime() === todayZero.getTime();
+
+                    // Logika Murojaah
+                    if (hasMurojaah) {
+                        dataMurojaah.push(1); colorsMurojaah.push('#3b82f6'); 
+                        statusMurojaah = safeMurojaah;
+                    } else {
+                        if (isPast) {
+                            dataMurojaah.push(0); colorsMurojaah.push('#ef4444'); 
+                            statusMurojaah = '<span class="text-red-500 font-medium text-xs bg-red-50 px-2 py-1 rounded">Terlewat</span>';
+                        } else if (isToday) {
+                            dataMurojaah.push(0); colorsMurojaah.push('#f59e0b'); 
+                            statusMurojaah = '<span class="text-yellow-600 font-medium text-xs bg-yellow-50 px-2 py-1 rounded">Belum Setor</span>';
+                        } else {
+                            dataMurojaah.push(null); colorsMurojaah.push('transparent');
+                        }
+                    }
+
+                    // Logika Ziyadah
+                    if (hasZiyadah) {
+                        dataZiyadah.push(1); colorsZiyadah.push('#10b981'); 
+                        statusZiyadah = safeZiyadah;
+                    } else {
+                        if (isPast) {
+                            dataZiyadah.push(0); colorsZiyadah.push('#ef4444'); 
+                            if (!hasMurojaah) statusZiyadah = '<span class="text-red-500 font-medium text-xs bg-red-50 px-2 py-1 rounded">Terlewat</span>';
+                        } else if (isToday) {
+                            dataZiyadah.push(0); colorsZiyadah.push('#f59e0b'); 
+                            if (!hasMurojaah) statusZiyadah = '<span class="text-yellow-600 font-medium text-xs bg-yellow-50 px-2 py-1 rounded">Belum Setor</span>';
+                        } else {
+                            dataZiyadah.push(null); colorsZiyadah.push('transparent');
+                        }
+                    }
+
+                    htmlContent += `
+                        <tr class="hover:bg-blue-50 transition-colors">
+                            <td class="px-4 py-3 border-b text-xs font-semibold whitespace-nowrap">${formatTanggalIndo(date.toISOString())}</td>
+                            <td class="px-4 py-3 border-b text-sm">${statusMurojaah}</td>
+                            <td class="px-4 py-3 border-b text-sm">${statusZiyadah}</td>
+                        </tr>
+                    `;
+                });
+                
+                tbodyMurojaah.innerHTML = htmlContent;
+                renderChart(labels, dataMurojaah, colorsMurojaah, dataZiyadah, colorsZiyadah);
+
+            } catch (error) {
+                console.error("Error Load Dashboard:", error);
+                tbodyMurojaah.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-red-500 font-bold bg-red-50">
+                    <div class="mb-1">⚠️ Gagal memuat data dasbor</div>
+                    <div class="text-xs font-normal text-red-400 break-words max-w-full">${error.message}</div>
+                </td></tr>`;
+                showToast("Gagal memuat data dashboard.", "error");
+            }
+        }
+
+        // 6. Rendering Chart yang Efisien
+        function renderChart(labels, dataMurojaah, colorsMurojaah, dataZiyadah, colorsZiyadah) {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            if (progressChartInstance) progressChartInstance.destroy();
+
+            progressChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Keaktifan Murojaah', data: dataMurojaah, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderWidth: 2.5, tension: 0.3, fill: false, pointBackgroundColor: colorsMurojaah, pointBorderColor: colorsMurojaah, pointRadius: 6, pointHoverRadius: 8, spanGaps: true },
+                        { label: 'Keaktifan Ziyadah', data: dataZiyadah, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderWidth: 2.5, tension: 0.3, fill: false, pointBackgroundColor: colorsZiyadah, pointBorderColor: colorsZiyadah, pointRadius: 6, pointHoverRadius: 8, spanGaps: true }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 1.2, ticks: { stepSize: 1, callback: v => v === 1 ? 'Setor' : (v === 0 ? 'Belum / Terlewat' : '') }, grid: { borderDash: [5, 5] } },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: true, labels: { font: { family: 'Inter', size: 12, weight: '600' }, usePointStyle: true, boxWidth: 8 } },
+                        tooltip: { callbacks: { label: ctx => ctx.parsed.y === 1 ? ` ${ctx.dataset.label}: Aktif Setor` : (ctx.parsed.y === 0 ? ` ${ctx.dataset.label}: Belum / Terlewat` : '') } }
+                    }
+                }
+            });
+        }
+
+        // Fungsi Pendukung
+        function navigate(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            setTimeout(() => document.getElementById(screenId + '-screen').classList.add('active'), 50);
+            if (screenId === 'dashboard') loadDashboardData();
+        }
+
+        function setClock() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            document.getElementById('realtime-clock').innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>${now.toLocaleDateString('id-ID', options).replace(/\./g, ':')}</span>
+            `;
+        }
+
+        function setMotivasi() {
+            const motivasiEl = document.getElementById('motivasi-text');
+            if (motivasiEl) motivasiEl.textContent = motivasiList[Math.floor(Math.random() * motivasiList.length)];
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
+        }
+
+        function formatTanggalIndo(dateString) {
+            if (!dateString || dateString === 'Belum ada data') return dateString;
+            try {
+                const d = new Date(dateString);
+                return isNaN(d.getTime()) ? dateString : d.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+            } catch(e) { return dateString; }
+        }
+
+        init();
+    </script>
+</body>
+</html>
